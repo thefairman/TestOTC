@@ -11,8 +11,11 @@ namespace TestOTC.Entities.Directus.WebDto
 		public string id { get; set; }
 		public string symbol { get; set; }
 		public DateTime start_timestamp { get; set; }
-		public decimal quote { get; set; }
+		//public decimal quote { get; set; }
 		public string c_from { get; set; }
 		public string c_to { get; set; }
+		public DateTime expire_timestamp { get; set; }
+		public decimal quote_price { get; set; }
+		public decimal inverse_price { get; set; }
 	}
 }

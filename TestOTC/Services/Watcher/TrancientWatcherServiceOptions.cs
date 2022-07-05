@@ -8,8 +8,8 @@ namespace TestOTC.Services.Watcher
 {
 	public class TrancientWatcherServiceOptions
 	{
-		public string From { get; set; }
-		public string To { get; set; }
-		public string Pair { get; set; }
+		//public string From { get; set; }
+		//public string To { get; set; }
+		public string Symbol { get; set; }
 	}
 }

@@ -12,6 +12,10 @@ using Titanium.Web.Proxy.Models;
 
 namespace TestOTC.Services.TitaniumProxy
 {
+	interface ITitaniumProxyService
+	{
+		public int MyProperty { get; set; }
+	}
 	internal class TitaniumProxyService : IHostedService
 	{
 		private readonly ProxyServer? _proxyServer;
@@ -27,7 +31,7 @@ namespace TestOTC.Services.TitaniumProxy
 			// locally trust root certificate used by this proxy 
 			//proxyServer.CertificateManager.TrustRootCertificate(true);
 
-			proxyServer.CertificateManager.CertificateEngine = Titanium.Web.Proxy.Network.CertificateEngine.DefaultWindows; 
+			proxyServer.CertificateManager.CertificateEngine = Titanium.Web.Proxy.Network.CertificateEngine.DefaultWindows;
 			proxyServer.CertificateManager.EnsureRootCertificate();
 
 			proxyServer.BeforeRequest += OnRequest;
@@ -54,6 +58,9 @@ namespace TestOTC.Services.TitaniumProxy
 			return Task.CompletedTask;
 		}
 
+		public event Action<string> OnQuoteRequest;
+		public event Action<string?, string> OnQuoteResponse;
+
 		public async Task OnRequest(object sender, SessionEventArgs e)
 		{
 			var method = e.HttpClient.Request.Method.ToUpper();
@@ -69,9 +76,10 @@ namespace TestOTC.Services.TitaniumProxy
 				//e.SetRequestBodyString(bodyString);
 
 				// store request 
-				// so that you can find it from response handler 
-				var guid = new Guid();
+				// so that you can find it from response handler
+				var guid = Guid.NewGuid().ToString();
 				e.UserData = guid;
+				OnQuoteRequest?.Invoke(guid);
 			}
 			//Console.WriteLine(e.HttpClient.Request.Url);
 
@@ -116,24 +124,22 @@ namespace TestOTC.Services.TitaniumProxy
 
 		public async Task OnResponse(object sender, SessionEventArgs e)
 		{
+			if (e.HttpClient.Request.RequestUri.AbsoluteUri != @"https://www.binance.com/bapi/margin/v1/private/new-otc/get-quote"
+				|| e.HttpClient.Request.Method != "POST") return;
 			// read response headers
 			//var responseHeaders = e.HttpClient.Response.Headers;
 
 			////if (!e.ProxySession.Request.Host.Equals("medeczane.sgk.gov.tr")) return;
-			//if (e.HttpClient.Request.Method == "GET" || e.HttpClient.Request.Method == "POST")
-			//{
-			//	if (e.HttpClient.Response.StatusCode == 200)
-			//	{
-			//		if (e.HttpClient.Response.ContentType != null && e.HttpClient.Response.ContentType.Trim().ToLower().Contains("application/json"))
-			//		{
-			//			byte[] bodyBytes = await e.GetResponseBody();
-			//			e.SetResponseBody(bodyBytes);
 
-			//			string body = await e.GetResponseBodyAsString();
-			//			e.SetResponseBodyString(body);
-			//		}
-			//	}
-			//}
+			if (e.HttpClient.Response.StatusCode == 200)
+			{
+				if (e.HttpClient.Response.ContentType != null && e.HttpClient.Response.ContentType.Trim().ToLower().Contains("application/json"))
+				{
+					string body = await e.GetResponseBodyAsString();
+					OnQuoteResponse?.Invoke(e.UserData as string, body);
+				}
+			}
+
 
 			//if (e.UserData != null)
 			//{

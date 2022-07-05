@@ -48,7 +48,7 @@ namespace TestOTC.Services.Watcher
 			var subResult = await _socketClient.SpotStreams.SubscribeToAllBookTickerUpdatesAsync(data =>
 			{
 				var reData = data.Data;
-				if (reData.Symbol != "BTCUSDT")
+				if (reData.Symbol != _options.Symbol)
 					return;
 				OnBookTickerData?.Invoke(data.Data);
 			});

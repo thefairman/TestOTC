@@ -8,7 +8,10 @@ namespace TestOTC.Entities.Selenium
 {
 	internal class QuoteItem
 	{
-		public decimal FromRate { get; set; }
-		public decimal ToRate { get; set; }
+		public decimal QuotePrice { get; set; }
+		public decimal InversePrice { get; set; }
+		public string? ToCoin { get; set; }
+		public string? FromCoin { get; set; }
+		public DateTime ExpiredTime { get; set; }
 	}
 }

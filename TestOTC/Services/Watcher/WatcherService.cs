@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using TestOTC.Entities.Directus;
 using TestOTC.Services.ExternalServices.HttpServices.Directus;
 using TestOTC.Services.Selenium;
+using TestOTC.Services.TitaniumProxy;
 
 namespace TestOTC.Services.Watcher
 {
@@ -31,7 +32,8 @@ namespace TestOTC.Services.Watcher
 						ILogger<WatcherService> logger,
 						IOptions<TrancientWatcherServiceOptions> options,
 						IBinanceDataProvider dataProvider,
-						IMapper mapper)
+						IMapper mapper,
+						TitaniumProxyService titaniumProxyService)
 		{
 			_directusServise = directusServise;
 			_logger = logger;
@@ -40,8 +42,10 @@ namespace TestOTC.Services.Watcher
 			_options = options.Value;
 			//_manualResetEvent = new ManualResetEventSlim();
 			_dataProvider.OnBookTickerData += OnBookTickerData;
-			_browserFirstWay = new SeleniumService(_options.From, _options.To);
-			_browserSecondWay = new SeleniumService(_options.To, _options.From);
+			//_browserFirstWay = new SeleniumService(_options.From, _options.To, titaniumProxyService);
+			//_browserSecondWay = new SeleniumService(_options.To, _options.From, titaniumProxyService);
+			_browserFirstWay = new SeleniumService(titaniumProxyService);
+			_browserSecondWay = new SeleniumService(titaniumProxyService);
 			_orderBook = new List<BookOrderEntity>();
 		}
 
@@ -68,37 +72,66 @@ namespace TestOTC.Services.Watcher
 			// only for test, move this stuff to MainService or remove or edit or not?
 			while (true)
 			{
-				_orderBook.Clear();
+				lock (lockList)
+				{
+					_orderBook.Clear();
+				}
 				var fq = _browserFirstWay.GetQuote();
-				var firTimeStart = DateTime.Now;
+				var firTimeStart = DateTime.UtcNow;
 				var sq = _browserSecondWay.GetQuote();
-				var secTimeStart = DateTime.Now;
+				var secTimeStart = DateTime.UtcNow;
 				//_manualResetEvent.Wait();
-				var deelay = secTimeStart.AddSeconds(6) - DateTime.Now;
+				var deelay = (sq.ExpiredTime != DateTime.MinValue ? sq.ExpiredTime.AddSeconds(1) : secTimeStart.AddSeconds(6)) - DateTime.UtcNow;
 				if (deelay > TimeSpan.Zero)
 					Thread.Sleep(deelay);
+				var iterationOrders = new List<BookOrderEntity>(_orderBook);
+
 				//var orders = _orderBook.ToList();
 				// todo: check for profitability
 				//await _directusServise.CreateOrderBooks(orders, cancellationToken);
-				await _directusServise.CreateOrderBooks(_orderBook, cancellationToken);
+				string fWatcherId = Guid.NewGuid().ToString();
+				string sWatcherId = Guid.NewGuid().ToString();
+				await _directusServise.CreateOrderBooks(iterationOrders, cancellationToken);
 				await _directusServise.CreateWatchers(new List<WatcherEntity> {
 					new WatcherEntity
-					{ 
-						From =  _browserFirstWay.From,
-						To = _browserFirstWay.To,
-						Quote = fq.ToRate,
+					{
+						Id = fWatcherId,
+						From =  fq.FromCoin!,
+						To = fq.ToCoin!,
 						StartTime = firTimeStart,
-						Symbol = _options.Pair
+						Symbol = _options.Symbol,
+						ExpireTime = fq.ExpiredTime,
+						InversePrice = fq.InversePrice,
+						QuotePrice = fq.QuotePrice,
 					},
 					new WatcherEntity
 					{
-						From =  _browserSecondWay.From,
-						To = _browserSecondWay.To,
-						Quote = sq.FromRate,
+						Id = sWatcherId,
+						From =  sq.FromCoin!,
+						To = sq.ToCoin!,
 						StartTime = secTimeStart,
-						Symbol = _options.Pair
+						Symbol = _options.Symbol,
+						ExpireTime = sq.ExpiredTime,
+						InversePrice = sq.InversePrice,
+						QuotePrice = sq.QuotePrice,
 					}
 				}, cancellationToken);
+				List<WatcherBookOrderEntity> watcherbookordres = new();
+				foreach (var item in iterationOrders)
+				{
+					watcherbookordres.Add(new WatcherBookOrderEntity
+					{
+						BookOrdersId = item.Id,
+						WatchersId = fWatcherId
+					});
+					watcherbookordres.Add(new WatcherBookOrderEntity
+					{
+						BookOrdersId = item.Id,
+						WatchersId = sWatcherId
+					});
+				}
+				await _directusServise.CreateWatcherBookOrders(watcherbookordres, cancellationToken);
+				await Task.Delay(TimeSpan.FromSeconds(40));
 			}
 		}
 

@@ -14,7 +14,8 @@ namespace TestOTC.Mappings
 		public WatcherProfile()
 		{
 			CreateMap<IBinanceBookPrice, BookOrderEntity>()
-				.ForMember(dest => dest.LocalTime, opt => opt.MapFrom(src => DateTime.Now));
+				.ForMember(dest => dest.LocalTime, opt => opt.MapFrom(src => DateTime.UtcNow))
+				.ForMember(dest => dest.Id, opt => opt.MapFrom(src => Guid.NewGuid().ToString()));
 		}
 	}
 }

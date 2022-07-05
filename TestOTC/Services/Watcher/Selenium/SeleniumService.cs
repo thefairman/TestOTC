@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using TestOTC.Entities.Selenium;
+using TestOTC.Services.TitaniumProxy;
 
 namespace TestOTC.Services.Selenium
 {
@@ -28,18 +29,37 @@ namespace TestOTC.Services.Selenium
 
 		private IWebDriver _driver;
 		private const string CookieFile = "cookies.txt";
-		private readonly string _from;
-		private readonly string _to;
+		//private readonly string _from;
+		//private readonly string _to;
+		private readonly TitaniumProxyService _titaniumProxy;
 
-		public string From => _from;
+		//public string From => _from;
 
-		public string To => _to;
+		//public string To => _to;
 
-		public SeleniumService(string from, string to)
+		public SeleniumService(/*string from, string to,*/ TitaniumProxyService titaniumProxy)
 		{
+			//_from = from;
+			//_to = to;
+			_titaniumProxy = titaniumProxy;
+			titaniumProxy.OnQuoteRequest += TitaniumProxy_OnQuoteRequest;
+			titaniumProxy.OnQuoteResponse += TitaniumProxy_OnQuoteResponse;
+		}
 
-			_from = from;
-			_to = to;
+		private QuoteDto? lastQuoteDto = null;
+
+		private void TitaniumProxy_OnQuoteResponse(string? arg1, string arg2)
+		{
+			if (arg1 != lastResponseId)
+				return;
+			lastQuoteDto = JsonSerializer.Deserialize<QuoteDto>(arg2);
+			_resetEvent.Set();
+		}
+
+		private void TitaniumProxy_OnQuoteRequest(string obj)
+		{
+			lastResponseId = obj;
+			_resetEvent.Set();
 		}
 
 		public void LaunchBrowser()
@@ -95,57 +115,61 @@ namespace TestOTC.Services.Selenium
 
 		public QuoteItem GetQuote()
 		{
-			InitQuote();
+			var quoteResp = InitQuote();
 			//var fromBy = By.XPath($"//div[contains(text(),'1 {From} =')]");
 			//var toBy = By.XPath($"//div[contains(text(),'1 {To} =')]");
-			var fromBy = By.XPath($"//div[contains(text(),'Цена')]/following::div");
-			var toBy = By.XPath($"//div[contains(text(),'братный курс')]/following::div");
+			//var fromBy = By.XPath($"//div[contains(text(),'Цена')]/following::div");
+			//var toBy = By.XPath($"//div[contains(text(),'братный курс')]/following::div");
 
-			var elemsFrom = _driver.FindElements(fromBy);
-			var elemsTo = _driver.FindElements(toBy);
+			//var elemsFrom = _driver.FindElements(fromBy);
+			//var elemsTo = _driver.FindElements(toBy);
 
-			if (elemsFrom.Count == 0 || elemsTo.Count == 0)
-				throw new Exception("Can't find from or to element!");
+			//if (elemsFrom.Count == 0 || elemsTo.Count == 0)
+			//	throw new Exception("Can't find from or to element!");
+
+			//return new QuoteItem
+			//{
+			//	FromRate = GetRate(elemsFrom.First().Text),
+			//	ToRate = GetRate(elemsTo.First().Text)
+			//};
 
 			return new QuoteItem
 			{
-				FromRate = GetRate(elemsFrom.First().Text),
-				ToRate = GetRate(elemsTo.First().Text)
+				QuotePrice = Convert.ToDecimal(quoteResp.quotePrice),
+				InversePrice = Convert.ToDecimal(quoteResp.inversePrice),
+				ExpiredTime = DateTimeOffset.FromUnixTimeMilliseconds(quoteResp.expireTimestamp).DateTime,
+				FromCoin = quoteResp.fromCoin,
+				ToCoin = quoteResp.toCoin,
 			};
 		}
 
+		private readonly ManualResetEvent _resetEvent = new ManualResetEvent(false);
 
-		private void InitQuote()
+		private string lastResponseId = null;
+		private Quote InitQuote()
 		{
 			var refreshBy = By.XPath("//button[contains(text(),'Обновить')]");
-			var waiterDivBy = By.XPath("//div[@class='css-kn9hza']");
-
-			//var receivedTexts = _driver.FindElements(waiterDivBy);
-			//if (receivedTexts.Count > 0)
-			//{
-			//	IJavaScriptExecutor js = (IJavaScriptExecutor)_driver;
-			//	//js.ExecuteScript("arguments[0].textContent='0';", receivedTexts.First());
-			//	js.ExecuteScript("arguments[0].innerText='0';", receivedTexts.First());
-			//}
 
 			var refresh = _driver.FindElements(refreshBy);
 			if (refresh.Count == 0)
 				throw new Exception("Don't find refresh button!");
 
+			_resetEvent.Reset();
+			lastResponseId = null;
 			refresh.First().Click();
-			Thread.Sleep(100);
+			_resetEvent.WaitOne(TimeSpan.FromSeconds(6));
+			if (string.IsNullOrWhiteSpace(lastResponseId))
+				throw new Exception("Request for quote didn't send!");
+			_resetEvent.Reset();
+			lastQuoteDto = null;
+			_resetEvent.WaitOne(TimeSpan.FromSeconds(6));
+			if (lastQuoteDto == null)
+				throw new Exception("Response didn't retrive or something went wrong!");
 
-			var waiterDivs = _driver.FindElements(waiterDivBy);
-			TimeOutLoop(
-				() => 
-				{ 
-					waiterDivs = _driver.FindElements(waiterDivBy);
-				},
-				() => waiterDivs.Count == 0,
-				TimeSpan.FromSeconds(6),
-				"Waiter div doesn't disapear!");
+			if (lastQuoteDto.data == null)
+				throw new Exception($"Unexpected response: {JsonSerializer.Serialize(lastQuoteDto)}");
 
-
+			return lastQuoteDto.data;
 			//if (receivedTexts.Count == 0)
 			//{
 			//	TimeOutLoop(

@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using TestOTC.Services.Watcher;
 using TestOTC.Services.Selenium;
 using TestOTC.Services.TitaniumProxy;
+using Serilog;
 
 namespace TestOTC.Configuration
 {
@@ -43,7 +44,9 @@ namespace TestOTC.Configuration
 
 				services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
 
-				services.AddHostedService<TitaniumProxyService>();
+				services.AddSingleton<TitaniumProxyService>();
+				services.AddHostedService<TitaniumProxyService>(p => p.GetRequiredService<TitaniumProxyService>());
+				//services.AddHostedService<TitaniumProxyService>();
 				services.AddHostedService<TService>();
 				services.AddHttpClient<DirectusService>().ConfigureHttpClient(10000, TimeSpan.FromSeconds(1), TimeSpan.FromMinutes(5));
 				services.AddSingleton<WatcherService>();
@@ -53,6 +56,14 @@ namespace TestOTC.Configuration
 				services.AddTransient<IBinanceClient, BinanceClient>();
 
 				services.AddSingleton<IBinanceDataProvider, BinanceDataProvider>();
+
+				Log.Logger = new LoggerConfiguration()
+					.MinimumLevel.Warning()
+					.WriteTo.File($"logs/otc_{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}_.txt", rollingInterval: RollingInterval.Day)
+					.CreateLogger();
+
+				services.AddLogging(loggingBuilder =>
+					 loggingBuilder.AddSerilog(dispose: true));
 			});
 	}
 }

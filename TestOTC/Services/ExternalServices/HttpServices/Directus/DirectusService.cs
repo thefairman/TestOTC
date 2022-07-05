@@ -19,6 +19,7 @@ namespace TestOTC.Services.ExternalServices.HttpServices.Directus
 	{
 		private const string OrdersCollection = "book_orders";
 		private const string WatchersCollection = "watchers";
+		private const string WatcherBookOrderCollection = "watchers_book_orders";
 
 		private readonly ILogger _logger;
 		private readonly IMapper _mapper;
@@ -320,16 +321,23 @@ namespace TestOTC.Services.ExternalServices.HttpServices.Directus
 
 		public async Task CreateOrderBooks(List<BookOrderEntity> orders, CancellationToken cancellationToken = default, int batchSize = -1)
 		{
-			_logger.LogInformation("started creating the miners");
+			_logger.LogInformation("started creating the bookr oreders");
 			await CreatetemsNoReturn<BookOrderEntity, BookOrderDto>(OrdersCollection, orders, batchSize, cancellationToken);
-			_logger.LogInformation("finished creating the miners");
+			_logger.LogInformation("finished creating the bookr oreders");
 		}
 
 		public async Task CreateWatchers(List<WatcherEntity> watchers, CancellationToken cancellationToken = default, int batchSize = -1)
 		{
-			_logger.LogInformation("started creating the miners");
+			_logger.LogInformation("started creating the watchers");
 			await CreatetemsNoReturn<WatcherEntity, WatcherDto>(WatchersCollection, watchers, batchSize, cancellationToken);
-			_logger.LogInformation("finished creating the miners");
+			_logger.LogInformation("finished creating the watchers");
+		}
+
+		public async Task CreateWatcherBookOrders(List<WatcherBookOrderEntity> watcherBookorders, CancellationToken cancellationToken = default, int batchSize = -1)
+		{
+			_logger.LogInformation("started creating the WatcherBookOrder");
+			await CreatetemsNoReturn<WatcherBookOrderEntity, WatcherBookOrderDto>(WatcherBookOrderCollection, watcherBookorders, batchSize, cancellationToken);
+			_logger.LogInformation("finished creating the WatcherBookOrder");
 		}
 	}
 }

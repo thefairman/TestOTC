@@ -11,8 +11,12 @@ namespace TestOTC.Entities.Directus
 		public string Id { get; set; }
 		public string Symbol { get; set; }
 		public DateTime StartTime { get; set; }
-		public decimal Quote { get; set; }
+		//public decimal Quote { get; set; }
 		public string From { get; set; }
 		public string To { get; set; }
+		public DateTime ExpireTime { get; set; }
+
+		public decimal QuotePrice { get; set; }
+		public decimal InversePrice { get; set; }
 	}
 }
